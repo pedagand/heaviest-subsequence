@@ -13,6 +13,29 @@ pub struct Tree<V, W> {
     children: Vec<Tree<V, W>>,
 }
 
+impl<V, W> Tree<V, W>
+where
+    V: Ord,
+    W: Ord,
+{
+    fn new(value: V, weight: W, pred: Option<Rc<Elem<V, W>>>) -> Self {
+        Tree {
+            elem: Rc::new(Elem {
+                value,
+                weight,
+                pred: pred.as_ref().map(Rc::downgrade),
+            }),
+            children: Vec::new(),
+        }
+    }
+
+    fn add_child(&mut self, other_tree: Tree<V, W>) {
+        assert!(self.elem.weight >= other_tree.elem.weight);
+        assert!(self.elem.value <= other_tree.elem.value);
+        self.children.push(other_tree)
+    }
+}
+
 pub struct GenericIncrSubseqForest<TS, F> {
     forest: TS,
     weight_fn: F,
@@ -27,12 +50,13 @@ pub trait TreeSet {
     fn first_after(&self, v: Self::Value) -> Option<Rc<Elem<Self::Value, Self::Weight>>>;
     fn max_elem(&self) -> Option<Rc<Elem<Self::Value, Self::Weight>>>;
     fn insert(&mut self, tree: Tree<Self::Value, Self::Weight>);
-    fn remove(&mut self, v: Self::Value) -> Option<Tree<Self::Value, Self::Weight>>;
+    fn remove(&mut self, v: Self::Value) -> Tree<Self::Value, Self::Weight>;
 }
 
 impl<V, W> TreeSet for BTreeMap<V, Tree<V, W>>
 where
     V: Copy + Ord,
+    W: Ord,
 {
     type Value = V;
     type Weight = W;
@@ -60,11 +84,17 @@ where
     }
 
     fn insert(&mut self, tree: Tree<V, W>) {
-        self.insert(tree.elem.value, tree);
+        use std::collections::btree_map::Entry::*;
+        match self.entry(tree.elem.value) {
+            Vacant(entry) => {
+                entry.insert(tree);
+            }
+            Occupied(mut entry) => entry.get_mut().add_child(tree),
+        }
     }
 
-    fn remove(&mut self, v: V) -> Option<Tree<V, W>> {
-        self.remove(&v)
+    fn remove(&mut self, v: V) -> Tree<V, W> {
+        self.remove(&v).unwrap()
     }
 }
 
@@ -119,22 +149,15 @@ where
             let prev_weight = predecessor.as_ref().map(|e| e.weight).unwrap_or_default();
             let cur_weight = (self.weight_fn)(cur_val) + prev_weight;
 
-            let mut children = Vec::new();
+            let mut new_tree = Tree::new(cur_val, cur_weight, predecessor);
             while let Some(node) = self.forest.first_after(cur_val) {
                 if cur_weight < node.weight {
                     break;
                 }
-                children.push(self.forest.remove(node.value).unwrap());
+                new_tree.add_child(self.forest.remove(node.value));
             }
 
-            self.forest.insert(Tree {
-                elem: Rc::new(Elem {
-                    value: cur_val,
-                    weight: cur_weight,
-                    pred: predecessor.as_ref().map(Rc::downgrade),
-                }),
-                children,
-            });
+            self.forest.insert(new_tree);
         }
     }
 }
