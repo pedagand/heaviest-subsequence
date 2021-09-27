@@ -1,0 +1,63 @@
+lus :: Ord a => [a] -> [a]
+lus <- MaxWith lenght · filter up · subseqs
+
+up :: Ord a => [a] -> Bool
+up xs = and (zipWith (<) xs (tail xs))
+
+step :: a -> [[a]] -> [[a]]
+step x xss = xss ++ map (x:) xss
+
+subseqs :: [a] -> [[a]]
+subseqs = foldr step [[]]
+
+nstep x xss = xss ++ map (x:) (filter (ok x) xss)
+
+=====================[1]=====================
+filter up (step x xss)
+ =
+filter up (xss ++ map (x:) xss)
+ = distrib filter over ++
+(filter up xss) ++ (filter up (map (x:) xss))
+ = unwrap filter and fuse into map
+(filter up xss) ++ (map (x:) (filter (ok x) (filter up xss)))
+ = definition of nstep
+nstep x (filter up xss)
+
+=====================[2]=====================
+filter up · subseqs
+ =
+filter up · foldr step [[]]
+ = foldr fusion with [1]
+foldr nstep [[]]
+
+=====================[3]=====================
+lus
+ =
+MaxWith lenght · filter up · subseqs
+ = by [2]
+MaxWith length · foldr nstep [[]]
+ = thin introduction rule with x <~= y => length x >= length y
+MaxWith lenght · ThinBy (<~=) · foldr nstep [[]]
+ <- [4]
+MaxWith length · foldr tstep [[]]
+ =
+last · sort length · foldr tstep [[]]
+ =
+last · foldr ststep [[]]
+
+=====================[4]=====================
+ThinBy (<~=) · foldr nstep [[]]
+ <- foldr fusion with [5]
+foldr tstep [[]]
+
+=====================[5]=====================
+ThinBy (<~=) · nstep x xss
+ -> in the book
+TB (TB xss ++ map (x:) (filter (ok x) (TB xss)))
+ -> define tstep = TB nstep
+tstep x (ThinBy (<~=) xss)
+
+=====================[6]=====================
+sort length (tstep x xs)
+    =
+ststep x (sort length xs)
